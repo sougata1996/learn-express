@@ -1,7 +1,7 @@
-import fs from 'fs';
-import path from 'path';
-import express, { Express, Request, Response, NextFunction } from 'express';
-import cors from 'cors';
+import fs from "fs";
+import path from "path";
+import express, { Express, Request, Response, NextFunction } from "express";
+import cors from "cors";
 
 interface User {
   id: number;
@@ -18,49 +18,82 @@ interface UserRequest extends Request {
 const app: Express = express();
 const port: number = 8000;
 
-const dataFile = './data/users.json';
+const dataFile = "../data/users.json";
 
 let users: User[];
 
 fs.readFile(path.resolve(__dirname, dataFile), (err, data) => {
-  console.log('reading file ... ');
+  console.log("reading file ... ");
   if (err) throw err;
   users = JSON.parse(data.toString());
 });
 
-const addMsgToRequest = (req: UserRequest, res: Response, next: NextFunction) => {
+const addMsgToRequest = (
+  req: UserRequest,
+  res: Response,
+  next: NextFunction
+) => {
   if (users) {
     req.users = users;
     next();
   } else {
     return res.json({
-      error: { message: 'users not found', status: 404 }
+      error: { message: "users not found", status: 404 },
     });
   }
 };
 
-app.use(cors({ origin: 'http://localhost:3000' }));
-app.use('/read/usernames', addMsgToRequest);
+app.use(cors({ origin: "http://localhost:3000" }));
+app.use("/read/usernames", addMsgToRequest);
 
-app.get('/read/usernames', (req: UserRequest, res: Response) => {
+app.get("/read/usernames", (req: UserRequest, res: Response) => {
   let usernames = req.users?.map((user) => {
     return { id: user.id, username: user.username };
   });
   res.send(usernames);
 });
 
+app.get(
+  "/read/username/:name",
+  addMsgToRequest,
+  (req: UserRequest, res: Response) => {
+    const username = req.params.name;
+
+    // Find the user by username
+    const user = req.users?.find((u) => u.username === username);
+
+    // Prepare the response as an array of objects with id and email
+    if (user) {
+      const emailResponse = [
+        {
+          id: user.id.toString(), // Convert id to string to match EmailResponse structure
+          email: user.email,
+        },
+      ];
+      res.json(emailResponse); // Return the array with one user
+    } else {
+      // Return an empty array if no user is found
+      res.json([]);
+    }
+  }
+);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use('/write/adduser', addMsgToRequest);
+app.use("/write/adduser", addMsgToRequest);
 
-app.post('/write/adduser', (req: UserRequest, res: Response) => {
+app.post("/write/adduser", (req: UserRequest, res: Response) => {
   let newuser = req.body as User;
   users.push(newuser);
-  fs.writeFile(path.resolve(__dirname, dataFile), JSON.stringify(users), (err) => {
-    if (err) console.log('Failed to write');
-    else console.log('User Saved');
-  });
-  res.send('done');
+  fs.writeFile(
+    path.resolve(__dirname, dataFile),
+    JSON.stringify(users),
+    (err) => {
+      if (err) console.log("Failed to write");
+      else console.log("User Saved");
+    }
+  );
+  res.send("done");
 });
 
 app.listen(port, () => {
